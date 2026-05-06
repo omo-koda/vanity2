@@ -1,91 +1,71 @@
 import React, { useState } from 'react'
-import { Copy, Eye, EyeOff, Download } from 'lucide-react'
+import { Copy, Eye, EyeOff, Download, Check, ShieldAlert } from 'lucide-react'
 
 export default function Results({ results }) {
   const [visibleKeys, setVisibleKeys] = useState({})
+  const [copied, setCopied] = useState(null)
 
   const toggleKeyVisibility = (index) => {
-    setVisibleKeys(prev => ({
-      ...prev,
-      [index]: !prev[index],
-    }))
+    setVisibleKeys(prev => ({ ...prev, [index]: !prev[index] }))
   }
 
-  const copyToClipboard = (text) => {
+  const copyToClipboard = (text, id) => {
     navigator.clipboard.writeText(text)
-    alert('Copied to clipboard!')
+    setCopied(id)
+    setTimeout(() => setCopied(null), 2000)
   }
 
-  const downloadKeystore = (address, privateKey) => {
-    // Simple keystore format (Simplified UTC/JSON)
-    const keystore = {
-      address,
-      privateKey,
-      generatedAt: new Date().toISOString(),
-    }
-    const json = JSON.stringify(keystore, null, 2)
-    const blob = new Blob([json], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${address.slice(0, 6)}-keystore.json`
-    a.click()
-  }
-
-  if (results.length === 0) {
-    return (
-      <div className="card">
-        <h2 className="text-xl font-bold mb-4">Results</h2>
-        <div className="text-center py-8 text-gray-500">
-          No addresses generated yet
-        </div>
-      </div>
-    )
-  }
+  if (results.length === 0) return null
 
   return (
-    <div className="card">
-      <h2 className="text-xl font-bold mb-4">Results ({results.length})</h2>
-      <div className="space-y-3 max-h-96 overflow-y-auto">
+    <div className="section-card">
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-lg font-bold text-white uppercase tracking-tighter">Generated Wallets ({results.length})</h2>
+        <div className="text-[10px] font-bold text-yellow-500 uppercase tracking-widest bg-yellow-500/10 px-2 py-1 rounded border border-yellow-500/20 flex items-center gap-1">
+          <ShieldAlert size={10} />
+          Never Share Private Keys
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3">
         {results.map((result, idx) => (
-          <div key={idx} className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
-            {/* Address */}
-            <div className="flex items-center justify-between gap-2 mb-2">
-              <div className="font-mono text-sm break-all text-primary-600 dark:text-primary-400" data-testid="result-address">
-                {result.address}
+          <div key={idx} className="bg-gray-950/50 border border-gray-800 rounded-xl p-4 hover:border-gray-700 transition-colors">
+            {/* Address Row */}
+            <div className="flex items-center justify-between gap-4 mb-4">
+              <div className="flex-1">
+                <div className="text-[10px] uppercase font-bold text-gray-500 mb-1">Blockchain Address</div>
+                <div className="font-mono text-sm text-primary-500 break-all leading-tight">
+                  {result.address}
+                </div>
               </div>
               <button
-                onClick={() => copyToClipboard(result.address)}
-                className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
-                title="Copy address"
+                onClick={() => copyToClipboard(result.address, `addr-${idx}`)}
+                className={`p-2 rounded-lg transition-all ${copied === `addr-${idx}` ? 'bg-secondary-500 text-white' : 'bg-gray-900 text-gray-400 hover:text-white'}`}
               >
-                <Copy size={16} />
+                {copied === `addr-${idx}` ? <Check size={16} /> : <Copy size={16} />}
               </button>
             </div>
 
-            {/* Private Key (Hidden by default) */}
-            <div className="flex items-center justify-between gap-2">
-              <div className="font-mono text-xs">
-                {visibleKeys[idx] ? (
-                  <span className="text-red-600 dark:text-red-400 break-all">{result.privateKey}</span>
-                ) : (
-                  <span className="text-gray-400">••••••••••••••••••••••••••••••••••••••••••</span>
-                )}
+            {/* Key Row */}
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex-1">
+                <div className="text-[10px] uppercase font-bold text-gray-500 mb-1">Private Key</div>
+                <div className={`font-mono text-xs break-all transition-all duration-300 ${visibleKeys[idx] ? 'text-red-400' : 'text-gray-700 blur-[4px] select-none'}`}>
+                  {result.privateKey}
+                </div>
               </div>
-              <div className="flex gap-1">
+              <div className="flex gap-2">
                 <button
                   onClick={() => toggleKeyVisibility(idx)}
-                  className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
-                  title={visibleKeys[idx] ? 'Hide private key' : 'Show private key'}
+                  className="p-2 bg-gray-900 text-gray-400 hover:text-white rounded-lg transition-all"
                 >
                   {visibleKeys[idx] ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
                 <button
-                  onClick={() => downloadKeystore(result.address, result.privateKey)}
-                  className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
-                  title="Download keystore"
+                  onClick={() => copyToClipboard(result.privateKey, `key-${idx}`)}
+                  className={`p-2 rounded-lg transition-all ${copied === `key-${idx}` ? 'bg-secondary-500 text-white' : 'bg-gray-900 text-gray-400 hover:text-white'}`}
                 >
-                  <Download size={16} />
+                  {copied === `key-${idx}` ? <Check size={16} /> : <Copy size={16} />}
                 </button>
               </div>
             </div>

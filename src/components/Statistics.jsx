@@ -1,41 +1,61 @@
 import React from 'react'
+import { Info, Gauge, ShieldCheck, Zap } from 'lucide-react'
 
 export default function Statistics() {
   return (
-    <div className="card">
-      <h2 className="text-xl font-bold mb-4">Tips & Statistics</h2>
-      
-      <div className="space-y-4 text-sm">
-        <div>
-          <h3 className="font-semibold mb-2">Difficulty Guide</h3>
-          <ul className="space-y-1 text-gray-600 dark:text-gray-400">
-            <li>🟢 1-2 chars: Very easy (instant)</li>
-            <li>🟡 3-4 chars: Easy (seconds)</li>
-            <li>🟠 5-6 chars: Medium (minutes)</li>
-            <li>🔴 7+ chars: Hard (hours/days)</li>
-          </ul>
+    <div className="space-y-6">
+      <div className="section-card border-primary-500/10 bg-primary-500/5">
+        <div className="flex items-center gap-2 mb-4 text-primary-500">
+          <Gauge size={18} />
+          <h3 className="text-xs font-bold uppercase tracking-widest">Difficulty Matrix</h3>
         </div>
-
-        <div>
-          <h3 className="font-semibold mb-2">Performance Factors</h3>
-          <ul className="space-y-1 text-gray-600 dark:text-gray-400">
-            <li>✓ Shorter patterns = faster</li>
-            <li>✓ More workers = faster</li>
-            <li>✓ Case-insensitive = faster</li>
-            <li>✓ Chrome = fastest browser</li>
-          </ul>
-        </div>
-
-        <div>
-          <h3 className="font-semibold mb-2">Best Practices</h3>
-          <ul className="space-y-1 text-gray-600 dark:text-gray-400">
-            <li>🔒 Back up private keys securely</li>
-            <li>🔒 Never share your private key</li>
-            <li>🔒 Use hardware wallet for storage</li>
-            <li>🔒 Verify full addresses, not just ends</li>
-          </ul>
+        <div className="space-y-3">
+          <DifficultyRow label="1-3 Chars" time="Seconds" color="text-secondary-500" />
+          <DifficultyRow label="4-5 Chars" time="Minutes" color="text-yellow-500" />
+          <DifficultyRow label="6-7 Chars" time="Hours" color="text-orange-500" />
+          <DifficultyRow label="8+ Chars" time="Days/Weeks" color="text-red-500" />
         </div>
       </div>
+
+      <div className="section-card">
+        <div className="flex items-center gap-2 mb-4 text-gray-400">
+          <Zap size={18} />
+          <h3 className="text-xs font-bold uppercase tracking-widest">Speed Optimization</h3>
+        </div>
+        <ul className="space-y-2 text-xs text-gray-500">
+          <li className="flex items-start gap-2">
+            <span className="text-secondary-500">✓</span> 
+            <span>Disable <strong>Case Sensitivity</strong> for 2x speed boost.</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-secondary-500">✓</span> 
+            <span>Use <strong>Chrome</strong> for maximum V8 crypto performance.</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-secondary-500">✓</span> 
+            <span>Set <strong>Worker Threads</strong> to match your CPU cores.</span>
+          </li>
+        </ul>
+      </div>
+
+      <div className="section-card bg-gray-900/10">
+        <div className="flex items-center gap-2 mb-4 text-secondary-500">
+          <ShieldCheck size={18} />
+          <h3 className="text-xs font-bold uppercase tracking-widest">Safety Protocol</h3>
+        </div>
+        <div className="p-3 bg-black/40 rounded-lg border border-gray-800 text-[10px] text-gray-400 leading-relaxed font-mono">
+          "Private keys are like physical keys. If someone copies them, they own your house. Store your results in a password manager or offline vault immediately after generation."
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function DifficultyRow({ label, time, color }) {
+  return (
+    <div className="flex justify-between items-center text-xs">
+      <span className="text-gray-400 font-medium">{label}</span>
+      <span className={`font-bold ${color}`}>{time}</span>
     </div>
   )
 }

@@ -12,21 +12,26 @@ export default {
       },
       colors: {
         primary: {
-          50: '#f0f4ff',
-          100: '#e5ebff',
-          500: '#667eea',
-          600: '#5568d3',
-          700: '#4c63c4',
-          800: '#3f4fa0',
-          900: '#2d3561',
+          50: '#f0f9ff',
+          100: '#e0f2fe',
+          500: '#0ea5e9', // Electric Blue
+          600: '#0284c7',
+          700: '#0369a1',
+          800: '#075985',
+          900: '#0c4a6e',
         },
         secondary: {
-          500: '#764ba2',
-          600: '#6a3f96',
-          700: '#5e358a',
+          500: '#22c55e', // Neon Green
+          600: '#16a34a',
+          700: '#15803d',
         },
+        dark: {
+          900: '#09090b', // Sidebar
+          950: '#0c0c0e', // Background
+        }
       },
       fontFamily: {
+        sans: ['Inter', 'system-ui', 'sans-serif'],
         mono: ['Fira Code', 'monospace'],
       },
     },

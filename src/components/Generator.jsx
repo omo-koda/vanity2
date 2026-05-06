@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react'
-import { Play, Square, Copy, Download, PauseCircle } from 'lucide-react'
+import React, { useState, useEffect, useRef } from 'react'
+import { Play, Square, Copy, Download, RefreshCw, Cpu, Zap, Activity } from 'lucide-react'
 import { generatePrivateKey, getPublicKey, getAddressFromPublicKey, matchesPattern, calculateDifficulty, formatTimeEstimate, validatePatternInputs } from '../utils/crypto'
 import { trackGenerationStarted, trackGenerationCompleted } from '../utils/analytics'
 import { getLimit, getCurrentTier } from '../utils/features'
 import UpgradeModal from './UpgradeModal'
+import Results from './Results'
 
-export default function Generator({ onResult, onStatsUpdate }) {
+export default function Generator() {
   const [prefix, setPrefix] = useState('')
   const [suffix, setSuffix] = useState('')
   const [caseSensitive, setCaseSensitive] = useState(false)
@@ -14,43 +15,18 @@ export default function Generator({ onResult, onStatsUpdate }) {
 
   const [isGenerating, setIsGenerating] = useState(false)
   const [attempts, setAttempts] = useState(0)
-  const [found, setFound] = useState(0)
+  const [foundCount, setFoundCount] = useState(0)
+  const [results, setResults] = useState([])
   const [speed, setSpeed] = useState(0)
   const [elapsed, setElapsed] = useState(0)
   const [eta, setEta] = useState(0)
-  const [workerError, setWorkerError] = useState(null)
-  const [isRateLimited, setIsRateLimited] = useState(false)
-  const [rateLimitMessage, setRateLimitMessage] = useState(null)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
 
-  const startTimeRef = React.useRef(null)
-  const generationRef = React.useRef(null)
-  const workersRef = React.useRef([])
-  const lastBatchTimeRef = React.useRef(0)
+  const startTimeRef = useRef(null)
+  const generationRef = useRef(null)
 
-  // Detect worker support once
-  const workersSupported = React.useRef((() => {
-    try {
-      const blob = new Blob(['self.onmessage=()=>{}'], { type: 'text/javascript' })
-      const url = URL.createObjectURL(blob)
-      const w = new Worker(url)
-      w.terminate()
-      URL.revokeObjectURL(url)
-      return true
-    } catch {
-      return false
-    }
-  })())
-
-  /**
-   * Start generation with optimized batching
-   */
   const handleStart = async () => {
-    if (!prefix && !suffix) {
-      alert('Enter a prefix or suffix')
-      return
-    }
-
+    if (!prefix && !suffix) return
     const validation = validatePatternInputs(prefix, suffix)
     if (!validation.valid) {
       alert(validation.error)
@@ -59,278 +35,221 @@ export default function Generator({ onResult, onStatsUpdate }) {
 
     setIsGenerating(true)
     setAttempts(0)
-    setFound(0)
+    setFoundCount(0)
+    setResults([])
     setSpeed(0)
     setElapsed(0)
-    setIsRateLimited(false)
-    setRateLimitMessage(null)
-    lastBatchTimeRef.current = Date.now()
     startTimeRef.current = Date.now()
 
     trackGenerationStarted('ethereum', prefix.length, suffix.length, workerCount)
 
     const difficulty = calculateDifficulty(prefix, suffix)
-    let localAttempts = 0
-    let localFound = 0
-
     const controller = { aborted: false }
     generationRef.current = controller
 
+    let localAttempts = 0
+    let localFound = 0
+
     while (!controller.aborted && localFound < maxResults) {
-      try {
-        for (let batch = 0; batch < 1000 && !controller.aborted && localFound < maxResults; batch++) {
-          const privateKey = generatePrivateKey()
-          const publicKey = getPublicKey(privateKey)
-          const address = getAddressFromPublicKey(publicKey)
+      // Small delay to allow UI to breathe
+      await new Promise(resolve => setTimeout(resolve, 0))
+      
+      for (let i = 0; i < 500 && !controller.aborted && localFound < maxResults; i++) {
+        const priv = generatePrivateKey()
+        const pub = getPublicKey(priv)
+        const addr = getAddressFromPublicKey(pub)
 
-          if (matchesPattern(address, prefix, suffix, caseSensitive)) {
-            localFound++
-            setFound(localFound)
-            onResult({ address, privateKey, timestamp: new Date() })
-          }
-
-          localAttempts++
+        if (matchesPattern(addr, prefix, suffix, caseSensitive)) {
+          localFound++
+          setFoundCount(localFound)
+          setResults(prev => [{ address: addr, privateKey: priv, timestamp: new Date() }, ...prev])
         }
-
-        const elapsed = (Date.now() - startTimeRef.current) / 1000
-        const speed = elapsed > 0 ? localAttempts / elapsed : 0
-        const eta = difficulty / (speed || 1)
-
-        setAttempts(localAttempts)
-        setSpeed(speed)
-        setElapsed(Math.round(elapsed))
-        setEta(Math.round(eta))
-
-        onStatsUpdate({
-          generated: localAttempts,
-          speed: Math.round(speed),
-          found: localFound,
-          elapsed: Math.round(elapsed),
-        })
-
-        // Rate limit detection: if batch took > 5s, pause briefly
-        const batchDuration = Date.now() - lastBatchTimeRef.current
-        if (batchDuration > 5000) {
-          setIsRateLimited(true)
-          setRateLimitMessage('Generation paused to prevent browser freeze. Resuming...')
-          await new Promise(resolve => setTimeout(resolve, 2000))
-          setIsRateLimited(false)
-          setRateLimitMessage(null)
-        }
-        lastBatchTimeRef.current = Date.now()
-
-        await new Promise(resolve => setTimeout(resolve, 0))
-      } catch (error) {
-        console.error('Generation error:', error)
+        localAttempts++
       }
+
+      const now = Date.now()
+      const totalElapsed = (now - startTimeRef.current) / 1000
+      const currentSpeed = localAttempts / (totalElapsed || 1)
+      
+      setAttempts(localAttempts)
+      setSpeed(Math.round(currentSpeed))
+      setElapsed(Math.round(totalElapsed))
+      setEta(Math.round(difficulty / (currentSpeed || 1)))
     }
-    const totalElapsed = (Date.now() - startTimeRef.current) / 1000
-    trackGenerationCompleted('ethereum', totalElapsed, localAttempts)
+
     setIsGenerating(false)
+    trackGenerationCompleted('ethereum', (Date.now() - startTimeRef.current) / 1000, localAttempts)
   }
 
   const handleStop = () => {
     setIsGenerating(false)
-    if (generationRef.current) {
-      generationRef.current.aborted = true
-    }
-    // Terminate any active workers
-    workersRef.current.forEach(w => { try { w.terminate() } catch {} })
-    workersRef.current = []
+    if (generationRef.current) generationRef.current.aborted = true
   }
 
-  // Cleanup workers on unmount
-  React.useEffect(() => {
-    return () => {
-      workersRef.current.forEach(w => { try { w.terminate() } catch {} })
-    }
-  }, [])
-
-  const progressPercent = Math.min((found / maxResults) * 100, 100)
-
   return (
-    <div className="card">
-      <h2 className="text-2xl font-bold mb-6">Address Generator</h2>
-
-      <div className="space-y-4">
-        {/* Inputs — stack on mobile, side-by-side on md+ */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div className="space-y-8">
+      {/* Configuration Section */}
+      <div className="section-card">
+        <div className="flex items-center justify-between mb-8">
           <div>
-            <label className="block text-sm font-medium mb-2">Prefix (optional)</label>
-            <input
-              type="text"
-              value={prefix}
-              onChange={(e) => setPrefix(e.target.value.replace(/[^0-9a-fA-F]/g, ''))}
-              placeholder="e.g., deadbeef"
-              disabled={isGenerating}
-              className="w-full px-4 py-3 bg-gray-800 rounded-lg border border-gray-700 focus:border-blue-500 focus:outline-none text-white input"
-              maxLength="10"
-              data-testid="prefix-input"
-            />
+            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+              <Zap size={20} className="text-primary-500" />
+              Standard Ethereum Generator
+            </h2>
+            <p className="text-sm text-gray-500 mt-1">Generate high-entropy vanity addresses locally.</p>
           </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">Suffix (optional)</label>
-          <input
-            type="text"
-            value={suffix}
-            onChange={(e) => setSuffix(e.target.value.replace(/[^0-9a-fA-F]/g, ''))}
-            placeholder="e.g., c0ffee"
-            disabled={isGenerating}
-            className="w-full px-4 py-3 bg-gray-800 rounded-lg border border-gray-700 focus:border-blue-500 focus:outline-none text-white input"
-            maxLength="10"
-            data-testid="suffix-input"
-          />
+          <div className="flex items-center gap-2 px-3 py-1 rounded-md bg-gray-800 border border-gray-700">
+            <Activity size={14} className={isGenerating ? 'text-secondary-500 animate-pulse' : 'text-gray-600'} />
+            <span className="text-[10px] font-bold uppercase text-gray-400">
+              {isGenerating ? 'Generating' : 'Idle'}
+            </span>
           </div>
         </div>
 
-        {/* Options */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium mb-2">Worker Threads</label>
-            <select
-              value={workerCount}
-              onChange={(e) => setWorkerCount(parseInt(e.target.value))}
-              disabled={isGenerating}
-              className="input"
-            >
-              {[1, 2, 4, 8, 16].map(n => (
-                <option key={n} value={n}>{n}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-2">Max Results</label>
-            <select
-              value={maxResults}
-              onChange={(e) => setMaxResults(parseInt(e.target.value))}
-              disabled={isGenerating}
-              className="input"
-            >
-              {[1, 5, 10, 25, 50, 100].map(n => (
-                <option key={n} value={n}>{n}</option>
-              ))}
-            </select>
-          </div>
-        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold uppercase text-gray-500 mb-2 tracking-widest">Prefix</label>
+                <input
+                  type="text"
+                  value={prefix}
+                  onChange={(e) => setPrefix(e.target.value.replace(/[^0-9a-fA-F]/g, ''))}
+                  placeholder="e.g. beef"
+                  className="input-mono text-lg"
+                  disabled={isGenerating}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase text-gray-500 mb-2 tracking-widest">Suffix</label>
+                <input
+                  type="text"
+                  value={suffix}
+                  onChange={(e) => setSuffix(e.target.value.replace(/[^0-9a-fA-F]/g, ''))}
+                  placeholder="e.g. c0de"
+                  className="input-mono text-lg"
+                  disabled={isGenerating}
+                />
+              </div>
+            </div>
 
-        {/* Checkbox */}
-        <div className="flex items-center gap-3">
-          <input
-            type="checkbox"
-            id="caseSensitive"
-            checked={caseSensitive}
-            onChange={(e) => setCaseSensitive(e.target.checked)}
-            disabled={isGenerating}
-            className="w-4 h-4"
-          />
-          <label htmlFor="caseSensitive" className="font-medium cursor-pointer">
-            Case Sensitive
-          </label>
-        </div>
+            <div className="flex items-center gap-6">
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={caseSensitive}
+                  onChange={(e) => setCaseSensitive(e.target.checked)}
+                  className="w-4 h-4 rounded border-gray-800 bg-gray-900 text-primary-500 focus:ring-primary-500"
+                  disabled={isGenerating}
+                />
+                <span className="text-sm font-medium text-gray-400 group-hover:text-white transition-colors">Case Sensitive</span>
+              </label>
+            </div>
 
-        {/* Difficulty Info */}
-        {(prefix || suffix) && (
-          <div className="alert alert-warning">
-            <strong>Estimated Time (50%):</strong>{' '}
-            {formatTimeEstimate(calculateDifficulty(prefix, suffix), 100000)}
-          </div>
-        )}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold uppercase text-gray-500 mb-2 tracking-widest">Workers</label>
+                <select
+                  value={workerCount}
+                  onChange={(e) => setWorkerCount(parseInt(e.target.value))}
+                  className="w-full bg-gray-950 border border-gray-800 rounded-lg p-2.5 text-sm outline-none focus:border-primary-500"
+                  disabled={isGenerating}
+                >
+                  {[1, 2, 4, 8, 16].map(n => <option key={n} value={n}>{n} Threads</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase text-gray-500 mb-2 tracking-widest">Limit</label>
+                <select
+                  value={maxResults}
+                  onChange={(e) => setMaxResults(parseInt(e.target.value))}
+                  className="w-full bg-gray-950 border border-gray-800 rounded-lg p-2.5 text-sm outline-none focus:border-primary-500"
+                  disabled={isGenerating}
+                >
+                  {[1, 5, 10, 25, 50].map(n => <option key={n} value={n}>{n} Results</option>)}
+                </select>
+              </div>
+            </div>
 
-        {/* Progress Bar */}
-        {isGenerating && (
-          <div>
-            <div className="flex justify-between text-sm mb-2">
-              <span>Progress: {found}/{maxResults}</span>
-              <span>{Math.round(progressPercent)}%</span>
-            </div>
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-              <div
-                className="bg-gradient-to-r from-primary-500 to-secondary-500 h-2 rounded-full transition-all"
-                style={{ width: `${progressPercent}%` }}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Stats */}
-        {isGenerating && (
-          <div className="grid grid-cols-2 gap-2 text-sm">
-            <div className="bg-gray-100 dark:bg-gray-700 p-2 rounded">
-              <div className="text-xs text-gray-500 dark:text-gray-400">Speed</div>
-              <div className="font-bold">{speed.toLocaleString(undefined, { maximumFractionDigits: 0 })} addr/s</div>
-            </div>
-            <div className="bg-gray-100 dark:bg-gray-700 p-2 rounded">
-              <div className="text-xs text-gray-500 dark:text-gray-400">ETA</div>
-              <div className="font-bold">{eta}s</div>
-            </div>
-            <div className="bg-gray-100 dark:bg-gray-700 p-2 rounded">
-              <div className="text-xs text-gray-500 dark:text-gray-400">Attempts</div>
-              <div className="font-bold">{attempts.toLocaleString()}</div>
-            </div>
-            <div className="bg-gray-100 dark:bg-gray-700 p-2 rounded">
-              <div className="text-xs text-gray-500 dark:text-gray-400">Elapsed</div>
-              <div className="font-bold">{elapsed}s</div>
+            <div className="pt-4">
+              {!isGenerating ? (
+                <button
+                  onClick={handleStart}
+                  disabled={!prefix && !suffix}
+                  className="btn-primary w-full py-4 text-lg"
+                >
+                  <Play size={20} fill="currentColor" />
+                  Start Generation
+                </button>
+              ) : (
+                <button
+                  onClick={handleStop}
+                  className="w-full py-4 bg-red-500/10 border border-red-500/50 text-red-500 rounded-xl font-bold hover:bg-red-500/20 flex items-center justify-center gap-2 transition-all"
+                >
+                  <Square size={20} fill="currentColor" />
+                  Stop Search
+                </button>
+              )}
             </div>
           </div>
-        )}
 
-        {/* Rate limit warning */}
-        {isRateLimited && (
-          <div className="bg-yellow-900/30 border border-yellow-600 rounded-lg p-3">
-            <div className="flex items-center gap-2 text-yellow-400">
-              <PauseCircle size={18} />
-              <span className="text-sm font-medium">{rateLimitMessage}</span>
+          <div className="bg-gray-950/50 border border-gray-800 rounded-xl p-6 flex flex-col justify-between">
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 text-primary-500">
+                <Cpu size={18} />
+                <h3 className="text-xs font-bold uppercase tracking-widest">Real-time Performance</h3>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <div className="text-[10px] uppercase text-gray-500 font-bold tracking-tighter">Current Speed</div>
+                  <div className="text-2xl font-mono font-bold text-white leading-none">
+                    {speed.toLocaleString()} <span className="text-[10px] text-gray-600">H/s</span>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-[10px] uppercase text-gray-500 font-bold tracking-tighter">Total Attempts</div>
+                  <div className="text-2xl font-mono font-bold text-white leading-none">
+                    {attempts.toLocaleString()}
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-[10px] uppercase text-gray-500 font-bold tracking-tighter">Elapsed Time</div>
+                  <div className="text-2xl font-mono font-bold text-white leading-none">
+                    {elapsed}s
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-[10px] uppercase text-gray-500 font-bold tracking-tighter">Probability (50%)</div>
+                  <div className="text-2xl font-mono font-bold text-secondary-500 leading-none">
+                    {eta}s
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-8 pt-8 border-t border-gray-800">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">Discovery Progress</span>
+                <span className="text-xs font-bold text-white">{foundCount} / {maxResults}</span>
+              </div>
+              <div className="h-2 w-full bg-gray-900 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-primary-500 transition-all duration-500" 
+                  style={{ width: `${(foundCount / maxResults) * 100}%` }}
+                />
+              </div>
             </div>
           </div>
-        )}
-
-        {/* Worker status */}
-        {!workersSupported.current && (
-          <div className="text-xs text-yellow-500 bg-yellow-500/10 px-3 py-2 rounded">
-            Web Workers unavailable — running in single-thread mode
-          </div>
-        )}
-
-        {/* Upgrade prompt */}
-        {found >= getLimit('maxResults') && getCurrentTier() === 'free' && (
-          <div className="bg-blue-900/30 border border-blue-600 rounded-lg p-4">
-            <p className="text-blue-300 text-sm">
-              You've reached the free tier limit ({getLimit('maxResults')} results).
-              <button
-                onClick={() => setShowUpgradeModal(true)}
-                className="text-blue-400 underline ml-1 font-medium"
-              >
-                Upgrade to Pro
-              </button>
-              {' '}for up to 100 results and all 6 chains.
-            </p>
-          </div>
-        )}
-
-        {/* Buttons */}
-        <div className="flex flex-col sm:flex-row gap-2">
-          {!isGenerating ? (
-            <button
-              onClick={handleStart}
-              className="btn btn-primary w-full sm:flex-1 flex items-center justify-center gap-2 py-3"
-              data-testid="start-button"
-            >
-              <Play size={18} />
-              Generate Address
-            </button>
-          ) : (
-            <button
-              onClick={handleStop}
-              className="btn bg-red-500 hover:bg-red-600 text-white w-full sm:flex-1 flex items-center justify-center gap-2 py-3"
-              data-testid="stop-button"
-            >
-              <Square size={18} />
-              Stop
-            </button>
-          )}
         </div>
       </div>
+
+      {/* Results Section */}
+      {results.length > 0 && (
+        <div className="animate-fadeIn">
+          <Results results={results} />
+        </div>
+      )}
 
       <UpgradeModal isOpen={showUpgradeModal} onClose={() => setShowUpgradeModal(false)} />
     </div>
