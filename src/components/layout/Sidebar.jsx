@@ -34,7 +34,10 @@ export default function Sidebar() {
           <Zap size={20} className="text-white fill-current" />
         </div>
         <div>
-          <h1 className="text-lg font-bold text-white tracking-tight">VanityCloak</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-bold text-white tracking-tight">VanityCloak</h1>
+            <span className="bg-primary-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-tighter">V2</span>
+          </div>
           <span className="text-[10px] uppercase tracking-widest text-primary-500 font-bold">
             {TIER_LABELS[tier]} Edition
           </span>
