@@ -4,7 +4,7 @@
  * All crypto operations run offline after first load.
  */
 
-const CACHE_NAME = 'cloakseed-v1'
+const CACHE_NAME = 'cloakseed-v2'
 
 const APP_SHELL = [
   '/',
