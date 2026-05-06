@@ -2,6 +2,8 @@
 
 **Ethereum vanity address generator + stealth seed phrase cloaking — 100% client-side.**
 
+[**Live Demo: vanity-cloakseed.vercel.app**](https://vanity-cloakseed.vercel.app/)
+
 Two tools in one app: brute-force custom ETH addresses (`0xDEAD...`, `0xBINO...`) and hide your seed phrase in plain sight with cipher overlays.
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)

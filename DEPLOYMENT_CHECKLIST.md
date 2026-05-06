@@ -416,7 +416,7 @@ Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'
 npm install
 npm run build    # Verify build works
 vercel          # Deploy in < 1 min
-# Done! URL: https://project-name.vercel.app
+# Done! URL: https://vanity-cloakseed.vercel.app
 ```
 
 **Local testing before deploy:**

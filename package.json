@@ -2,6 +2,7 @@
   "name": "vanity-cloakseed",
   "version": "3.0.0",
   "description": "Vanity-ETH Pro + CloakSeed: Ethereum vanity generator + stealth seed phrase cloaking",
+  "homepage": "https://vanity-cloakseed.vercel.app",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
@@ -43,6 +44,7 @@
     "eslint": "^8.54.0",
     "postcss": "^8.4.31",
     "typescript": "^5.3.3",
+    "vercel": "^53.2.0",
     "vite": "^5.4.21",
     "vitest": "^2.1.8"
   },
