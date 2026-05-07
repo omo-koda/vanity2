@@ -1,6 +1,6 @@
 {
   "name": "vanity-cloakseed",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "description": "Vanity-ETH Pro + CloakSeed: Ethereum vanity generator + stealth seed phrase cloaking",
   "homepage": "https://vanity-cloakseed.vercel.app",
   "type": "module",

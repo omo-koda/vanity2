@@ -20,7 +20,7 @@ npm run dev
 # Opens http://localhost:5173
 ```
 
-Two tabs: **🔑 Vanity Generator** (default) and **🔐 CloakSeed**.
+Features a **Professional Sidebar Dashboard** for instant access to all tools.
 
 ---
 
