@@ -5,7 +5,11 @@ import {
   isValidBip39Word,
   getBip39Wordlist,
   suggestWords,
+  deriveBitcoinWallet,
+  deriveSolanaWallet,
+  getAllAddresses,
 } from '../bip39Helper'
+import { THEMES } from '../wordlists'
 
 const VALID_MNEMONIC = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
 
@@ -90,6 +94,37 @@ describe('bip39Helper.ts', () => {
 
     it('returns empty for no match', () => {
       expect(suggestWords('xyzzy')).toEqual([])
+    })
+  })
+
+  describe('advanced derivation', () => {
+    it('derives a SegWit Bitcoin address by default', () => {
+      const wallet = deriveBitcoinWallet(VALID_MNEMONIC)
+      expect(wallet.address).toMatch(/^bc1[0-9a-z]+$/)
+    })
+
+    it('derives a valid Solana address', () => {
+      const wallet = deriveSolanaWallet(VALID_MNEMONIC)
+      expect(wallet.address).toMatch(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/)
+    })
+
+    it('returns addresses for all supported chains', async () => {
+      const addresses = await getAllAddresses(VALID_MNEMONIC)
+      expect(addresses).toHaveProperty('ethereum')
+      expect(addresses).toHaveProperty('bitcoin')
+      expect(addresses).toHaveProperty('solana')
+      expect(addresses).toHaveProperty('sui')
+      expect(addresses).toHaveProperty('cosmos')
+      expect(addresses).toHaveProperty('aptos')
+    })
+  })
+
+  describe('wordlist integrity', () => {
+    it('exports 2048 unique words for each theme', () => {
+      Object.values(THEMES).forEach(theme => {
+        expect(theme.words.length).toBe(2048)
+        expect(new Set(theme.words).size).toBe(2048)
+      })
     })
   })
 })

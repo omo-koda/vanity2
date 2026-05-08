@@ -22,6 +22,8 @@ export function useAddressGenerator() {
   const startTimeRef = useRef(null)
   const statsIntervalRef = useRef(null)
   const attemptsRef = useRef(0)
+  const workerAttemptsRef = useRef({})
+  const foundRef = useRef(0)
   const lastAttemptTimeRef = useRef(0)
 
   /**
@@ -31,6 +33,8 @@ export function useAddressGenerator() {
     // Clean up existing workers
     workersRef.current.forEach(w => w.terminate())
     workersRef.current = []
+    workerAttemptsRef.current = {}
+    foundRef.current = 0
 
     for (let i = 0; i < count; i++) {
       const worker = new Worker(
@@ -43,15 +47,22 @@ export function useAddressGenerator() {
 
         if (type === 'result') {
           const { address, privateKey } = payload
+          foundRef.current += 1
           setResults(prev => [...prev, { address, privateKey, timestamp: new Date() }])
         } else if (type === 'stats') {
-          attemptsRef.current += 1000
+          const lastWorkerAttempts = workerAttemptsRef.current[payload.workerId] || 0
+          const delta = payload.attempts - lastWorkerAttempts
+          workerAttemptsRef.current[payload.workerId] = payload.attempts
+          if (delta > 0) {
+            attemptsRef.current += delta
+          }
           lastAttemptTimeRef.current = Date.now()
           setStats(prev => ({
             ...prev,
             attempts: attemptsRef.current,
-            speed: payload.speed,
           }))
+        } else if (type === 'error') {
+          setError(`Worker ${payload.workerId} failed: ${payload.error}`)
         }
       }
 
@@ -117,12 +128,14 @@ export function useAddressGenerator() {
 
       setStats(prev => ({
         ...prev,
+        attempts: attemptsRef.current,
+        speed: Math.round(avgSpeed),
         elapsed: Math.round(elapsed),
         eta: Math.round(eta),
       }))
 
       // Stop if we have enough results
-      if (results.length >= maxResults) {
+      if (foundRef.current >= maxResults) {
         stopGeneration()
       }
     }, 500)

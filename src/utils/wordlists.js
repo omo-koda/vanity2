@@ -1,3 +1,5 @@
+import * as bip39 from 'bip39'
+
 /**
  * CloakSeed: Preloaded word themes for custom ciphers
  * 5 theme categories × 2048 words each
@@ -255,6 +257,25 @@ export const THEMES = {
     ]
   }
 };
+
+// Ensure each theme has 2048 unique words for full cipher entropy
+function ensureUniqueThemeWords(theme) {
+  const unique = [...new Set(theme.words)]
+  if (unique.length !== theme.words.length) {
+    const fallback = bip39.wordlists.EN.filter(word => !unique.includes(word))
+    while (unique.length < 2048 && fallback.length) {
+      unique.push(fallback.shift())
+    }
+  }
+
+  if (unique.length !== 2048) {
+    throw new Error(`CloakSeed theme \"${theme.name}\" must contain 2048 unique words.`)
+  }
+
+  theme.words = unique
+}
+
+Object.values(THEMES).forEach(ensureUniqueThemeWords)
 
 // Export all word lists flattened
 export const allWords = Object.values(THEMES).flatMap(theme => theme.words);

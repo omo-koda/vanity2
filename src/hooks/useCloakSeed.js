@@ -210,7 +210,7 @@ export function useCloakSeed() {
       setCloakPhrase(cloak);
 
       // Derive all addresses
-      const addresses = getAllAddresses(seedPhrase);
+      const addresses = await getAllAddresses(seedPhrase);
       setWallets(addresses);
 
       return {
@@ -258,7 +258,7 @@ export function useCloakSeed() {
       }
 
       // Derive addresses
-      const addresses = getAllAddresses(seed);
+      const addresses = await getAllAddresses(seed);
       
       setRestoredSeed(seed);
       setRestoredWallets(addresses);
@@ -292,7 +292,7 @@ export function useCloakSeed() {
       const { cloakPhrase: fakeCloak, seedPhrase: fakeSeed } = generatePanicPhrase(cipherWords);
 
       // Derive fake wallet
-      const fakeAddresses = getAllAddresses(fakeSeed);
+      const fakeAddresses = await getAllAddresses(fakeSeed);
 
       setPanicPhrase(fakeCloak);
       setPanicWallets(fakeAddresses);
@@ -330,8 +330,8 @@ export function useCloakSeed() {
 
   const clearClipboard = useCallback(async () => {
     try {
-      // Overwrite with marker before clearing to defeat clipboard history managers
-      await navigator.clipboard.writeText('[CLEARED]');
+      // Overwrite clipboard with an empty value to minimize accidental exposure.
+      await navigator.clipboard.writeText('');
       setClipboard({ text: '', copiedAt: null });
     } catch (err) {
       console.error('Failed to clear clipboard:', err);

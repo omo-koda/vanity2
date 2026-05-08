@@ -4,6 +4,7 @@ import {
   decryptPrivateKey,
   encryptWithChecksum,
   verifyChecksum,
+  generateKeystoreJSON,
 } from '../encryption'
 
 const TEST_KEY = 'ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'
@@ -35,6 +36,20 @@ describe('encryption.ts', () => {
       const encrypted = await encryptPrivateKey('', PASSWORD)
       const decrypted = await decryptPrivateKey(encrypted, PASSWORD)
       expect(decrypted).toBe('')
+    })
+
+    it('requires a strong password', async () => {
+      await expect(encryptPrivateKey(TEST_KEY, 'short')).rejects.toThrow(/at least 12/)
+    })
+
+    it('generates a keystore JSON payload from encrypted key material', async () => {
+      const encrypted = await encryptPrivateKey(TEST_KEY, PASSWORD)
+      const keystore = generateKeystoreJSON('0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef', encrypted, { id: 'ethereum' })
+      expect(keystore.version).toBe(3)
+      expect(keystore.crypto.cipher).toBe('aes-256-gcm')
+      expect(keystore.crypto.cipherparams.iv).toHaveLength(24)
+      expect(keystore.crypto.kdfparams.salt).toHaveLength(32)
+      expect(keystore.address).toBe('deadbeefdeadbeefdeadbeefdeadbeefdeadbeef')
     })
   })
 

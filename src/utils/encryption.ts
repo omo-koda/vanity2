@@ -5,6 +5,10 @@ import type { EncryptedPayload, QRPayload } from './types'
  */
 
 export async function encryptPrivateKey(privateKey: string, password: string): Promise<string> {
+  if (typeof password !== 'string' || password.trim().length < 12) {
+    throw new Error('Password must be at least 12 characters long.')
+  }
+
   const encoder = new TextEncoder()
   const salt = crypto.getRandomValues(new Uint8Array(16))
   const iv = crypto.getRandomValues(new Uint8Array(12))
@@ -82,17 +86,21 @@ interface KeystoreJSON {
 }
 
 export function generateKeystoreJSON(address: string, encryptedKey: string, chain: { id: string }): KeystoreJSON {
-  const parts = encryptedKey.split('$')
+  const combined = base64ToBytes(encryptedKey)
+  const salt = combined.slice(0, 16)
+  const iv = combined.slice(16, 28)
+  const ciphertext = combined.slice(28)
+
   return {
     version: 3,
     id: generateUUID(),
-    address: address.replace('0x', ''),
+    address: address.replace(/^0x/i, ''),
     crypto: {
-      ciphertext: parts[0] || '',
-      cipherparams: { iv: parts[1] || '' },
-      cipher: 'aes-256-ctr',
+      ciphertext: bytesToHex(ciphertext),
+      cipherparams: { iv: bytesToHex(iv) },
+      cipher: 'aes-256-gcm',
       kdf: 'pbkdf2',
-      kdfparams: { dkLen: 32, salt: parts[2] || '', c: 100_000, prf: 'hmac-sha256' },
+      kdfparams: { dkLen: 32, salt: bytesToHex(salt), c: 100_000, prf: 'hmac-sha256' },
     },
     chain: chain.id,
   }
